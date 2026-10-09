@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Menu Prise de Masse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: carnet de cuisine — sélecteur semaine/jour en tête, repas du jour en liste, suivi poids et repères à côté (empilés sur mobile) */
+:root {
+  --bg: #f4f6f3;
+  --surface: #ffffff;
+  --ink: #18302c;
+  --muted: #5d6f6a;
+  --line: #d9e1dc;
+  --accent: #c99214;      /* jaune Comté */
+  --accent-soft: #f6ecd2;
+  --teal: #1f5e55;
+  --teal-soft: #e2eeeb;
+  --done: #2f7d4f;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121a19; --surface: #1a2523; --ink: #e6eeeb; --muted: #9db0aa; --line: #2c3a37;
+    --accent: #e7b53e; --accent-soft: #3a3020; --teal: #7cc4b6; --teal-soft: #1e3532; --done: #6ccf93;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121a19; --surface: #1a2523; --ink: #e6eeeb; --muted: #9db0aa; --line: #2c3a37;
+  --accent: #e7b53e; --accent-soft: #3a3020; --teal: #7cc4b6; --teal-soft: #1e3532; --done: #6ccf93;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 48px; display: grid; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.6rem, 4vw, 2.3rem); line-height: 1.05; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h1 span { color: var(--accent); }
+.sub { color: var(--muted); margin: 4px 0 0; font-size: 0.9rem; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; margin: 0; }
+.label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 700; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.seg { display: inline-flex; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; color: var(--ink); font: inherit; font-weight: 700; padding: 6px 14px; border-radius: 999px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--teal); color: var(--bg); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.day { border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 10px; padding: 8px 2px; font: inherit; cursor: pointer; display: grid; gap: 2px; justify-items: center; }
+.day b { font-family: var(--font-display); font-size: 0.95rem; }
+.day small { font-size: 0.66rem; color: var(--muted); }
+.day[aria-pressed="true"] { border-color: var(--teal); background: var(--teal-soft); box-shadow: inset 0 0 0 1px var(--teal); }
+.day .today { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.day .today[hidden] { display: none; }
+
+.main { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 820px) { .main { grid-template-columns: minmax(0, 1fr); } }
+
+.daycol { display: grid; gap: 12px; }
+.dayhead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+.meter { display: grid; gap: 6px; min-width: 200px; flex: 1; max-width: 340px; }
+.meter-top { display: flex; justify-content: space-between; font-size: 0.85rem; }
+.bar { height: 10px; background: var(--line); border-radius: 999px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .3s ease; }
+.note { background: var(--accent-soft); border-radius: 10px; padding: 8px 12px; font-size: 0.88rem; }
+.note[hidden] { display: none; }
+
+.meal { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.meal.done { border-color: var(--done); }
+.meal.done .items { color: var(--muted); }
+.check { width: 28px; height: 28px; border-radius: 8px; border: 2px solid var(--line); background: transparent; cursor: pointer; display: grid; place-items: center; color: var(--bg); padding: 0; }
+.meal.done .check { background: var(--done); border-color: var(--done); }
+.check svg { width: 16px; height: 16px; opacity: 0; }
+.meal.done .check svg { opacity: 1; }
+.meal h3 { margin: 0 0 4px; font-size: 1rem; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.meal h3 .time { font-size: 0.75rem; color: var(--muted); font-weight: 400; }
+.tag { font-size: 0.7rem; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--teal-soft); color: var(--teal); }
+.tag.cantine { background: var(--line); color: var(--muted); }
+.items { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 0.92rem; }
+.items li { display: flex; gap: 8px; }
+.items li::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); margin-top: 0.6em; flex: none; }
+.kcal { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); white-space: nowrap; }
+
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.chips .label { margin-right: 4px; min-width: 64px; }
+.chip { font: inherit; font-size: 0.8rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); font-weight: 700; }
+.ca { font-size: 0.78rem; color: var(--muted); margin: 6px 0 0; }
+.sync { font-size: 0.82rem; padding: 6px 10px; border-radius: 8px; background: var(--bg); color: var(--muted); }
+.sync.ok { background: var(--teal-soft); color: var(--teal); }
+.sync.err { background: var(--accent-soft); color: var(--ink); }
+.side { display: grid; gap: 16px; }
+.shop { display: grid; gap: 8px; }
+.shop h3 { margin: 0 0 6px; font-size: 0.95rem; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.shop h3 span { font-size: 0.75rem; color: var(--muted); font-weight: 400; }
+.shop ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.shop label { display: flex; gap: 10px; align-items: flex-start; padding: 5px 4px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+.shop label:hover { background: var(--teal-soft); }
+.shop input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--done); flex: none; }
+.shop input:checked + span { text-decoration: line-through; color: var(--muted); }
+.shop .opt { font-size: 0.75rem; color: var(--muted); }
+.shop .shopgrp { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: var(--bg); }
+.shop .shopgrp summary { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; list-style-position: inside; }
+.shop .shopgrp[open] summary { margin-bottom: 6px; }
+.shop .gmeta { font-size: 0.75rem; color: var(--muted); font-weight: 400; font-family: var(--font-mono); }
+.shop .shopgrp.complete .gmeta { color: var(--done); font-weight: 700; }
+.shoptop { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 12px; }
+.wform { display: flex; flex-wrap: wrap; gap: 8px; }
+.wform input { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); min-width: 0; }
+.wform input[type="date"] { flex: 1 1 140px; }
+.wform input[type="number"] { flex: 0 1 90px; }
+.btn { font: inherit; font-weight: 700; border: 0; border-radius: 8px; padding: 8px 14px; background: var(--teal); color: var(--bg); cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); font-weight: 400; padding: 4px 10px; font-size: 0.8rem; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.stat { display: grid; gap: 2px; }
+.stat b { font-family: var(--font-display); font-size: 1.25rem; }
+.chart { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--muted); font-family: var(--font-mono); font-size: 10px; }
+.status { font-size: 0.88rem; padding: 8px 12px; border-radius: 10px; background: var(--teal-soft); }
+.status.warn { background: var(--accent-soft); }
+.wlist { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; max-height: 160px; overflow: auto; font-size: 0.88rem; }
+.wlist li { display: flex; justify-content: space-between; align-items: center; gap: 8px; border-bottom: 1px dashed var(--line); padding-block: 2px; }
+.wlist button { border: 0; background: none; color: var(--muted); cursor: pointer; font: inherit; }
+.rules { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 0.9rem; }
+details summary { cursor: pointer; font-weight: 700; }
+details[open] summary { margin-bottom: 8px; }
+.small { font-size: 0.8rem; color: var(--muted); margin: 0; }
+details .label { margin: 10px 0 4px; }
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Menu prise de <span>masse</span></h1>
+      <p class="sub">~3 000 kcal · 130–150 g de protéines par jour · sans lait, avoine, avocat ni sardines</p>
+    </div>
+    <div class="seg" role="group" aria-label="Semaine">
+      <button id="wA" type="button">Semaine A</button>
+      <button id="wB" type="button">Semaine B</button>
+    </div>
+  </header>
+
+  <nav class="days" id="days" aria-label="Jour"></nav>
+
+  <div class="main">
+    <section class="daycol" aria-live="polite">
+      <div class="dayhead">
+        <div>
+          <div class="label" id="dayLabel"></div>
+          <h2 id="dayTitle"></h2>
+        </div>
+        <div class="meter">
+          <div class="meter-top"><span>Mangé aujourd'hui</span><span class="mono" id="kcalTxt"></span></div>
+          <div class="bar"><i id="kcalBar"></i></div>
+        </div>
+      </div>
+      <div class="note" id="cookNote" hidden></div>
+      <div id="meals" class="daycol"></div>
+      <p class="small">Riz, pâtes et lentilles pesés crus · viande et poisson crus, sans os · 1 fruit ≈ 150 g. Les cases cochées concernent la date du jour réel.</p>
+    </section>
+
+    <aside class="side">
+      <section class="panel" aria-labelledby="wTitle">
+        <h2 id="wTitle">Suivi du poids</h2>
+        <div class="sync local" id="syncStatus" role="status"></div>
+        <details>
+          <summary>Synchronisation</summary>
+          <form class="wform" id="keyForm">
+            <input type="password" id="keyInput" aria-label="Code d'accès" placeholder="Code d'accès" autocomplete="off">
+            <button class="btn" type="submit">Enregistrer</button>
+            <button class="btn ghost" type="button" id="syncBtn">Actualiser</button>
+          </form>
+        </details>
+        <form class="wform" id="wForm">
+          <input type="date" id="wDate" aria-label="Date de la pesée" required>
+          <input type="number" id="wKg" aria-label="Poids en kg" step="0.1" min="30" max="150" placeholder="kg" required>
+          <button class="btn" type="submit">Ajouter</button>
+        </form>
+        <div class="stats">
+          <div class="stat"><span class="label">Départ</span><b class="mono" id="sStart">–</b></div>
+          <div class="stat"><span class="label">Actuel</span><b class="mono" id="sNow">–</b></div>
+          <div class="stat"><span class="label">kg / sem.</span><b class="mono" id="sRate">–</b></div>
+        </div>
+        <svg class="chart" id="chart" viewBox="0 0 320 150" role="img" aria-label="Courbe du poids"></svg>
+        <div class="status" id="wStatus"></div>
+        <ul class="wlist" id="wList"></ul>
+        <p class="small">Pesée une fois par semaine, même jour, à jeun. Objectif : +0,3 à 0,5 kg par semaine. Avec le code d'accès, les pesées sont enregistrées dans la Google Sheet familiale.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="shopTitle">
+        <div class="shoptop">
+          <h2 id="shopTitle">Liste de courses</h2>
+          <span class="mono small" id="shopCount"></span>
+        </div>
+        <div class="shop" id="shop"></div>
+        <button class="btn ghost" type="button" id="shopReset">Tout décocher</button>
+      </section>
+
+      <section class="panel">
+        <h2>Repères</h2>
+        <ul class="rules">
+          <li>Eau minérale riche en calcium (&gt; 300 mg/L) : environ 1 L par jour.</li>
+          <li>Comté : 40 à 60 g par jour au total.</li>
+          <li>Thon listao de préférence (1 boîte ≈ 140 g égoutté).</li>
+          <li>Cantine : double féculents, 2-3 morceaux de pain, entrée + plat + dessert.</li>
+          <li>Cuissons : un batch le dimanche, un le mercredi. Pancakes le samedi, à congeler.</li>
+          <li>2 à 3 séances de 40-45 min par semaine, et au moins 7 h de sommeil.</li>
+        </ul>
+        <details>
+          <summary>Recette du pain de thon (4 parts)</summary>
+          <ul class="rules">
+            <li>420 g de thon égoutté, 5 œufs, 3 c. à soupe de concentré de tomate, 60 g de chapelure.</li>
+            <li>1 oignon revenu dans 1 c. à soupe d'huile d'olive, persil, sel, poivre.</li>
+            <li>Mélanger, verser dans un moule à cake, 40-45 min à 180 °C. Servir froid.</li>
+            <li>Pain de poulet : même recette avec du poulet cuit effiloché.</li>
+          </ul>
+        </details>
+        <details>
+          <summary>Banana bread maison sans lait (~11 tranches)</summary>
+          <ul class="rules">
+            <li>3 bananes bien mûres écrasées, 2 œufs, 70 g d'huile, 80 g de sucre.</li>
+            <li>250 g de farine (complète ou T65), 1 sachet de levure, 1 pincée de sel, 50 g de noix (facultatif).</li>
+            <li>Mélanger, verser dans un moule à cake, 50 min à 180 °C. Couper en tranches de 80 g ; se congèle très bien.</li>
+          </ul>
+        </details>
+        <details>
+          <summary>Smoothie fruité sans lait (1 goûter, ~650 kcal)</summary>
+          <ul class="rules">
+            <li>300 ml de jus d'orange, d'ananas ou de mangue, bien frais.</li>
+            <li>1 banane + 100 g de fruits : mangue, fraises ou fruits rouges surgelés (pas besoin de glaçons).</li>
+            <li>25 g de beurre de cacahuète (1 c. à soupe bombée) + 20 g de miel (1 c. à soupe).</li>
+            <li>Mixer 1 minute jusqu'à texture lisse. À boire tout de suite, avec 30 g de fruits secs à côté.</li>
+            <li>Astuce : préparer des sachets « banane coupée + fruits » au congélateur ; il ne reste qu'à ajouter le jus.</li>
+          </ul>
+        </details>
+        <details>
+          <summary>Pancakes à l'eau (≈ 10 pancakes = 2 petits-déjeuners)</summary>
+          <p class="label">Ingrédients</p>
+          <ul class="rules">
+            <li>250 g de farine + 1 sachet de levure chimique</li>
+            <li>30 g de sucre + 1 pincée de sel (+ vanille, facultatif)</li>
+            <li>2 œufs + 30 g d'huile neutre (2 c. à soupe)</li>
+            <li>300 ml d'eau, pétillante de préférence (pancakes plus légers)</li>
+          </ul>
+          <p class="label">Préparation · 10 min + 20 min de cuisson</p>
+          <ol class="rules">
+            <li>Mélanger la farine, la levure, le sucre et le sel dans un saladier.</li>
+            <li>Creuser un puits, ajouter les œufs et l'huile, puis verser l'eau petit à petit en fouettant, jusqu'à une pâte épaisse et sans grumeaux.</li>
+            <li>Laisser reposer 10 min si possible.</li>
+            <li>Chauffer une poêle à feu moyen, l'essuyer avec un papier huilé, puis verser une petite louche de pâte (≈ 50 ml).</li>
+            <li>Cuire 1 à 2 min, jusqu'à ce que des bulles apparaissent en surface, puis retourner et cuire encore 1 min.</li>
+          </ol>
+          <p class="label">Conservation</p>
+          <ul class="rules">
+            <li>Laisser refroidir, puis congeler en séparant les pancakes avec du papier cuisson.</li>
+            <li>Le matin : 4 à 5 pancakes (≈ 200 g) au grille-pain ou 30 s au micro-ondes, avec 30 g de confiture et 2 œufs durs.</li>
+          </ul>
+        </details>
+        <details>
+          <summary>Muffins-omelette (12 muffins = 3 goûters)</summary>
+          <p class="label">Ingrédients</p>
+          <ul class="rules">
+            <li>8 œufs</li>
+            <li>150 g de dés de jambon ou de poulet cuit</li>
+            <li>200 g de légumes : 1 poivron, ½ oignon, quelques tomates cerises ou une poignée d'épinards</li>
+            <li>60 g de Comté râpé (ou autre fromage à pâte dure)</li>
+            <li>Sel, poivre, un peu d'huile pour le moule</li>
+          </ul>
+          <p class="label">Préparation · 10 min + 22 min de cuisson</p>
+          <ol class="rules">
+            <li>Préchauffer le four à 180 °C. Huiler un moule à 12 muffins (le silicone se démoule plus facilement) ou utiliser des caissettes.</li>
+            <li>Couper les légumes en petits dés. Faire revenir le poivron et l'oignon 5 min à la poêle : ils rendent leur eau et les muffins ne seront pas détrempés.</li>
+            <li>Répartir dans chaque empreinte le jambon, les légumes et le fromage, jusqu'aux deux tiers de la hauteur.</li>
+            <li>Battre les œufs avec le sel et le poivre, puis verser jusqu'aux trois quarts de chaque empreinte (ils gonflent à la cuisson).</li>
+            <li>Cuire 20 à 22 min : les muffins sont gonflés et dorés, et la pointe d'un couteau ressort propre.</li>
+            <li>Laisser tiédir 5 min avant de démouler, sinon ils se cassent.</li>
+          </ol>
+          <p class="label">Conservation</p>
+          <ul class="rules">
+            <li>4 jours au réfrigérateur, dans une boîte fermée : 4 muffins par goûter.</li>
+            <li>Se congèlent 1 mois. Se mangent froids, ou 30 s au micro-ondes.</li>
+          </ul>
+        </details>
+        <details>
+          <summary>Boulettes (≈ 18 boulettes = 3 goûters)</summary>
+          <p class="label">Ingrédients</p>
+          <ul class="rules">
+            <li>600 g de viande hachée (bœuf 5 %, ou moitié bœuf, moitié poulet ou dinde)</li>
+            <li>1 œuf + 50 g de chapelure</li>
+            <li>1 oignon haché très finement (ou râpé) + 1 gousse d'ail écrasée</li>
+            <li>2 c. à soupe de persil haché</li>
+            <li>1 c. à café de cumin, 1 c. à café de paprika, ½ c. à café de sel, poivre</li>
+            <li>30 g de parmesan ou d'emmental râpé (facultatif, pour le goût et le calcium)</li>
+            <li>1 c. à soupe d'huile d'olive</li>
+          </ul>
+          <p class="label">Préparation · 15 min + 20 min de cuisson</p>
+          <ol class="rules">
+            <li>Préchauffer le four à 200 °C et couvrir une plaque de papier cuisson.</li>
+            <li>Dans un saladier, mélanger à la main tous les ingrédients sauf l'huile, sans trop pétrir (les boulettes restent plus tendres).</li>
+            <li>Les mains humides, former des boulettes de la taille d'une noix (environ 35 g) : on en obtient environ 18.</li>
+            <li>Les poser espacées sur la plaque et les badigeonner d'huile au pinceau.</li>
+            <li>Cuire 18 à 20 min en les retournant à mi-cuisson. Elles doivent être cuites à cœur, sans trace rose, surtout avec de la volaille.</li>
+          </ol>
+          <p class="label">Conservation</p>
+          <ul class="rules">
+            <li>Laisser refroidir, puis répartir 6 boulettes par boîte (≈ 150 g cuites).</li>
+            <li>3 jours au réfrigérateur : congeler la boîte du mercredi et la sortir la veille au soir.</li>
+            <li>Se mangent froides dans du pain, ou réchauffées 1 min au micro-ondes.</li>
+          </ul>
+        </details>
+        <button class="btn ghost" type="button" id="resetDay">Décocher les repas du jour</button>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function () {
+  var store = {
+    get: function (k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+    set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  };
+
+  var PD = {
+    "Salé": { k: 750, it: ["3 œufs brouillés + 20 g de Comté", "120 g de pain complet + 10 g de beurre", "1 fruit + 250 ml de jus"] },
+    "Sucré": { k: 700, it: ["120 g de pain complet", "30 g de beurre de cacahuète", "1 banane + 250 ml de jus"] },
+    "Pancakes": { k: 700, it: ["200 g de pancakes à l'eau + 30 g de confiture", "2 œufs durs"] }
+  };
+  var CHEESES = [
+    { n: "Comté", g: 30, ca: 300 }, { n: "Emmental", g: 30, ca: 300 }, { n: "Parmesan", g: 30, ca: 350 },
+    { n: "Beaufort", g: 30, ca: 300 }, { n: "Gruyère", g: 30, ca: 300 }, { n: "Mimolette", g: 30, ca: 250 },
+    { n: "Cantal", g: 40, ca: 300 }, { n: "Tomme", g: 40, ca: 280 }
+  ];
+  var cheeseIdx = Math.max(0, CHEESES.map(function (c) { return c.n; }).indexOf(store.get("mpm.cheese", "Comté")));
+  var STARCH = [{ id: "pain", n: "Pain complet" }, { id: "wrap", n: "Wrap" }, { id: "bb", n: "Banana bread" }];
+  var ROT = ["pain", "wrap", "bb", "pain", "wrap", "bb", "pain"];
+  var starchOv = store.get("mpm.starch", {});
+  function starchFor() { return starchOv[state.week + "-" + state.day] || ROT[state.day]; }
+  var GOUT = [
+    { id: "thon", n: "Pain de thon", d: function () { return Gt("Pain de thon (200 g)"); } },
+    { id: "muffins", n: "Muffins", d: function () { return Gt("Muffins-omelette (200 g)"); } },
+    { id: "boulettes", n: "Boulettes", d: function () { return Gt("Boulettes (150 g)"); } },
+    { id: "poulet", n: "Pain de poulet", d: function () { return Gt("Pain de poulet (200 g)"); } },
+    { id: "smoothie", n: "Smoothie fruité", d: function () { return { k: 650, it: ["Smoothie : 300 ml de jus + 1 banane + 100 g de fruits", "25 g de beurre de cacahuète + 20 g de miel", "30 g de fruits secs"], low: true }; } },
+    { id: "bb", n: "Banana bread", d: function () { return { k: 770, it: ["2 tranches de banana bread maison (160 g)", "30 g d'amandes", "1 fruit"], low: true }; } }
+  ];
+  var GDEF = {
+    A: ["thon", "thon", "thon", "muffins", "muffins", "bb", "smoothie"],
+    B: ["boulettes", "boulettes", "boulettes", "poulet", "poulet", "bb", "smoothie"]
+  };
+  var goutOv = store.get("mpm.gouter", {});
+  function goutFor() { return goutOv[state.week + "-" + state.day] || GDEF[state.week][state.day]; }
+  function GOUTER() { var id = goutFor(); for (var i = 0; i < GOUT.length; i++) if (GOUT[i].id === id) return GOUT[i].d(); return GOUT[0].d(); }
+  function COLL() {
+    var c = CHEESES[cheeseIdx], s = starchFor(), first;
+    if (s === "wrap") first = "1 grande tortilla complète (60 g) + " + c.g + " g de " + c.n + " + quelques crudités";
+    else if (s === "bb") first = "1 tranche de banana bread maison (80 g) + " + c.g + " g de " + c.n + " en cubes";
+    else first = "80 g de pain complet + " + c.g + " g de " + c.n;
+    return { k: 380, it: [first, "ou 30 g de fruits secs + 1 fruit"] };
+  }
+  var CANT = { k: 900, cantine: true, it: ["Double portion de féculents", "2-3 morceaux de pain", "Entrée + plat + dessert"] };
+  var G = ["80 g de pain complet", "1 fruit + 250 ml de jus"];
+  var D = ["50 g de pain + 1 fruit"];
+  function L(k, it) { return { k: k, it: it }; }
+  function Gt(p) { return { k: 650, it: [p].concat(G) }; }
+
+  var W = {
+    A: [
+      ["Salé", CANT, Gt("Pain de thon (200 g)"), L(850, ["Pâtes bolognaise : 110 g de pâtes crues + 150 g de bœuf haché 5 %", "100 g de sauce tomate + 20 g de Comté", "100 g de salade + 10 g d'huile"].concat(D))],
+      ["Sucré", CANT, Gt("Pain de thon (200 g)"), L(800, ["110 g de riz cru + 150 g de poulet colombo", "200 g de légumes + 10 g d'huile"].concat(D))],
+      ["Pancakes", L(850, ["150 g de poisson + 300 g d'igname", "200 g de légumes + 10 g d'huile", "50 g de pain + 1 fruit"]), Gt("Pain de thon (200 g)"), L(800, ["Omelette : 4 œufs + 20 g de Comté", "300 g de pommes de terre sautées (10 g d'huile)", "100 g de salade"].concat(D)), "Cuisson des muffins-omelette pour jeudi à samedi."],
+      ["Salé", CANT, Gt("Muffins-omelette (200 g)"), L(800, ["Chili : 150 g de poulet ou dinde hachés + 80 g de haricots rouges", "100 g de sauce tomate + 110 g de riz cru"].concat(D))],
+      ["Sucré", CANT, Gt("Muffins-omelette (200 g)"), L(800, ["150 g de steak haché", "300 g de frites au four (10 g d'huile)", "200 g de haricots verts"].concat(D))],
+      ["Pancakes", L(850, ["150 g de poulet rôti (sans os)", "300 g de pommes de terre + 200 g de légumes", "50 g de pain + 1 fruit"]), Gt("Muffins-omelette (200 g)"), L(900, ["Pizza maison : 150 g de pâte + 80 g de sauce tomate", "60 g de jambon + 40 g de Comté", "100 g de salade + 10 g d'huile"].concat(D)), "Préparer les pancakes de la semaine et les congeler."],
+      ["Salé", L(850, ["150 g de bœuf en ragoût + 110 g de riz cru", "200 g de légumes", "50 g de pain + 1 fruit"]), { k: 650, it: ["Smoothie : 300 ml de jus + 1 banane + 100 g de fruits", "25 g de beurre de cacahuète + 20 g de miel", "30 g de fruits secs"] }, L(800, ["110 g de pâtes crues + 140 g de thon égoutté", "100 g de sauce tomate", "200 g de légumes poêlés (10 g d'huile)"].concat(D)), "Cuisson des boulettes pour lundi à mercredi (semaine B)."]
+    ],
+    B: [
+      ["Salé", CANT, Gt("Boulettes (150 g)"), L(800, ["110 g de riz cru + 150 g de poisson", "200 g de légumes + 10 g d'huile"].concat(D))],
+      ["Sucré", CANT, Gt("Boulettes (150 g)"), L(800, ["110 g de pâtes crues + 150 g de poulet", "100 g de sauce tomate + 20 g de Comté", "200 g de légumes"].concat(D))],
+      ["Pancakes", L(900, ["Salade : 100 g de lentilles crues + 2 œufs durs + 20 g de noix", "100 g de crudités + 20 g d'huile en vinaigrette", "80 g de pain + 1 fruit"]), Gt("Boulettes (150 g)"), L(800, ["110 g de riz cru + 150 g de poulet curry", "200 g de légumes + 10 g d'huile"].concat(D)), "Cuisson du pain de poulet pour jeudi à samedi."],
+      ["Salé", CANT, Gt("Pain de poulet (200 g)"), L(800, ["Omelette : 4 œufs + 20 g de Comté", "300 g de patates douces au four (10 g d'huile)", "100 g de salade"].concat(D))],
+      ["Sucré", CANT, Gt("Pain de poulet (200 g)"), L(900, ["2 wraps : 2 tortillas (120 g) + 150 g de poulet", "40 g de houmous + 100 g de crudités", "250 g de pommes de terre au four"].concat(D))],
+      ["Pancakes", L(850, ["150 g de porc ou poisson en colombo + 110 g de riz cru", "200 g de légumes", "50 g de pain + 1 fruit"]), Gt("Pain de poulet (200 g)"), L(900, ["Burger : 1 pain (80 g) + 150 g de steak haché + 30 g de Comté", "100 g de crudités + 250 g de pommes de terre au four", "1 fruit"]), "Préparer les pancakes de la semaine et les congeler."],
+      ["Salé", L(850, ["150 g de poulet rôti (sans os)", "300 g de pommes de terre rôties + 200 g de brocoli", "50 g de pain + 1 fruit"]), { k: 650, it: ["Smoothie : 300 ml de jus + 1 banane + 100 g de fruits", "25 g de beurre de cacahuète + 20 g de miel", "30 g de fruits secs"] }, L(850, ["Pâtes bolognaise : 110 g de pâtes crues + 150 g de bœuf haché 5 %", "100 g de sauce tomate + 20 g de Comté", "100 g de salade + 10 g d'huile"].concat(D)), "Cuisson du pain de thon pour lundi à mercredi (semaine A)."]
+    ]
+  };
+  var DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+  var SHORT = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
+  function isoWeek(d) {
+    var t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    var n = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - n);
+    var y = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    return Math.ceil(((t - y) / 864e5 + 1) / 7);
+  }
+  function ymd(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  var now = new Date();
+  var todayIdx = (now.getDay() + 6) % 7;
+  var todayKey = ymd(now);
+  var autoWeek = isoWeek(now) % 2 === 0 ? "A" : "B";
+  var state = { week: store.get("mpm.week", autoWeek), day: todayIdx };
+  var checks = store.get("mpm.checks", {});
+  // ===== Synchronisation Google Sheets =====
+  // Coller ici l'URL de l'application web Apps Script (elle se termine par /exec)
+  var SHEET_URL = "https://script.google.com/macros/s/AKfycbzbyuMhME3cjOo0I_gl_8Hh5PG63ra1106IBZWQHmU09ohK6NGX8xR2iGFC8SqGncOS5w/exec";
+  var weights = store.get("mpm.weights", []);
+  var syncKey = store.get("mpm.key", "");
+  function urlOk() { return SHEET_URL.indexOf("https://script.google.com/") === 0; }
+  function setSync(state, msg) { var e = document.getElementById("syncStatus"); e.className = "sync " + state; e.textContent = msg; }
+  function applyServer(j) {
+    if (!j || !j.ok) throw new Error((j && j.error) || "réponse inattendue");
+    weights = j.data; store.set("mpm.weights", weights); renderWeight();
+    setSync("ok", "Synchronisé avec la Google Sheet");
+  }
+  function pull() {
+    if (!urlOk()) { setSync("local", "Enregistrement en ligne non configuré : les pesées restent sur cet appareil."); return; }
+    if (!syncKey) { setSync("local", "Entrez le code d'accès pour synchroniser les pesées."); return; }
+    setSync("busy", "Synchronisation…");
+    fetch(SHEET_URL + "?key=" + encodeURIComponent(syncKey))
+      .then(function (r) { return r.json(); }).then(applyServer)
+      .catch(function (e) { setSync("err", "Synchronisation impossible (" + e.message + "). Vérifiez la connexion ou le code."); });
+  }
+  function push(action, w) {
+    if (!urlOk() || !syncKey) return;
+    setSync("busy", "Envoi…");
+    fetch(SHEET_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ key: syncKey, action: action, d: w.d, kg: w.kg }) })
+      .then(function (r) { return r.json(); }).then(applyServer)
+      .catch(function (e) { setSync("err", "Envoi impossible (" + e.message + "). Ressaisissez cette pesée une fois connecté."); });
+  }
+
+  function el(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; }
+
+  function meals() {
+    var r = W[state.week][state.day];
+    return [
+      { id: "pd", name: "Petit-déjeuner", time: "7h", tag: r[0], data: PD[r[0]] },
+      { id: "c10", name: "Collation", time: "10h", data: COLL() },
+      { id: "dej", name: "Déjeuner", time: "12h", data: r[1] },
+      { id: "gou", name: "Goûter", time: "16-17h", data: GOUTER() },
+      { id: "din", name: "Dîner", time: "19h30", data: r[3] }
+    ];
+  }
+
+  function renderDays() {
+    var nav = document.getElementById("days"); nav.textContent = "";
+    DAYS.forEach(function (d, i) {
+      var b = el("button", "day"); b.type = "button";
+      b.setAttribute("aria-pressed", String(i === state.day));
+      b.appendChild(el("b", null, SHORT[i]));
+      var cant = W[state.week][i][1].cantine;
+      b.appendChild(el("small", null, cant ? "cantine" : "maison"));
+      var dot = el("span", "today"); dot.hidden = i !== todayIdx; b.appendChild(dot);
+      b.addEventListener("click", function () { state.day = i; render(); });
+      nav.appendChild(b);
+    });
+    document.getElementById("wA").setAttribute("aria-pressed", String(state.week === "A"));
+    document.getElementById("wB").setAttribute("aria-pressed", String(state.week === "B"));
+  }
+
+  var checkSvg = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.5"/></svg>';
+
+  function renderDay() {
+    var isToday = state.day === todayIdx;
+    document.getElementById("dayLabel").textContent = "Semaine " + state.week + (isToday ? " · aujourd'hui" : "");
+    document.getElementById("dayTitle").textContent = DAYS[state.day];
+    var row = W[state.week][state.day];
+    var note = document.getElementById("cookNote");
+    note.hidden = !row[4]; note.textContent = row[4] ? "À préparer : " + row[4] : "";
+    var box = document.getElementById("meals"); box.textContent = "";
+    var dayChecks = checks[todayKey] || {};
+    var total = 0, eaten = 0;
+    meals().forEach(function (m) {
+      total += m.data.k;
+      var done = isToday && !!dayChecks[m.id];
+      if (done) eaten += m.data.k;
+      var card = el("article", "meal" + (done ? " done" : ""));
+      var cb = el("button", "check"); cb.type = "button"; cb.innerHTML = checkSvg;
+      cb.setAttribute("aria-label", (done ? "Décocher " : "Cocher ") + m.name);
+      cb.setAttribute("aria-pressed", String(done));
+      cb.disabled = !isToday;
+      cb.title = isToday ? "Marquer comme mangé" : "Le suivi se fait sur le jour en cours";
+      if (!isToday) cb.style.opacity = ".4";
+      cb.addEventListener("click", function () {
+        var c = checks[todayKey] || {}; c[m.id] = !c[m.id]; checks[todayKey] = c;
+        var keep = {}; keep[todayKey] = checks[todayKey]; checks = keep;
+        store.set("mpm.checks", checks); renderDay();
+      });
+      var body = el("div");
+      var h = el("h3"); h.appendChild(document.createTextNode(m.name));
+      h.appendChild(el("span", "time", m.time));
+      if (m.tag) h.appendChild(el("span", "tag", m.tag));
+      if (m.data.cantine) h.appendChild(el("span", "tag cantine", "Cantine"));
+      body.appendChild(h);
+      var ul = el("ul", "items");
+      m.data.it.forEach(function (t) { ul.appendChild(el("li", null, t)); });
+      body.appendChild(ul);
+      if (m.id === "gou") {
+        var gch = el("div", "chips"); gch.setAttribute("role", "group"); gch.setAttribute("aria-label", "Choix du goûter");
+        var gcur = goutFor();
+        GOUT.forEach(function (g) {
+          var b = el("button", "chip", g.n); b.type = "button";
+          b.setAttribute("aria-pressed", String(g.id === gcur));
+          b.addEventListener("click", function () {
+            var key = state.week + "-" + state.day;
+            if (g.id === GDEF[state.week][state.day]) delete goutOv[key]; else goutOv[key] = g.id;
+            store.set("mpm.gouter", goutOv); renderDay();
+          });
+          gch.appendChild(b);
+        });
+        body.appendChild(gch);
+        if (m.data.low) body.appendChild(el("p", "ca", "Goûter moins riche en protéines : ajouter 1 œuf ou 20 g de viande au dîner."));
+      }
+      if (m.id === "c10") {
+        var sch = el("div", "chips"); sch.setAttribute("role", "group"); sch.setAttribute("aria-label", "Choix du féculent");
+        sch.appendChild(el("span", "label", "Féculent"));
+        var cur = starchFor();
+        STARCH.forEach(function (s) {
+          var b = el("button", "chip", s.n); b.type = "button";
+          b.setAttribute("aria-pressed", String(s.id === cur));
+          b.addEventListener("click", function () {
+            var key = state.week + "-" + state.day;
+            if (s.id === ROT[state.day]) delete starchOv[key]; else starchOv[key] = s.id;
+            store.set("mpm.starch", starchOv); renderDay();
+          });
+          sch.appendChild(b);
+        });
+        body.appendChild(sch);
+        var chips = el("div", "chips"); chips.setAttribute("role", "group"); chips.setAttribute("aria-label", "Choix du fromage");
+        chips.appendChild(el("span", "label", "Fromage"));
+        CHEESES.forEach(function (c, i) {
+          var b = el("button", "chip", c.n); b.type = "button";
+          b.setAttribute("aria-pressed", String(i === cheeseIdx));
+          b.addEventListener("click", function () { cheeseIdx = i; store.set("mpm.cheese", c.n); renderDay(); });
+          chips.appendChild(b);
+        });
+        body.appendChild(chips);
+        var cc = CHEESES[cheeseIdx];
+        body.appendChild(el("p", "ca", cc.g + " g de " + cc.n + " ≈ " + cc.ca + " mg de calcium"));
+      }
+      card.appendChild(cb); card.appendChild(body);
+      card.appendChild(el("span", "kcal", "~" + m.data.k + " kcal"));
+      box.appendChild(card);
+    });
+    document.getElementById("kcalTxt").textContent = isToday ? ("~" + eaten + " / " + total + " kcal") : ("~" + total + " kcal prévus");
+    document.getElementById("kcalBar").style.width = (isToday ? Math.min(100, eaten / total * 100) : 0) + "%";
+  }
+
+  function fmt(n) { return n.toFixed(1).replace(".", ","); }
+  function renderWeight() {
+    weights.sort(function (a, b) { return a.d < b.d ? -1 : 1; });
+    if (!weights.length) {
+      ["sStart", "sNow", "sRate"].forEach(function (id) { document.getElementById(id).textContent = "–"; });
+      document.getElementById("wStatus").className = "status";
+      document.getElementById("wStatus").textContent = "Aucune pesée pour l'instant : ajoutez la première ci-dessus.";
+      document.getElementById("chart").textContent = "";
+      document.getElementById("wList").textContent = "";
+      return;
+    }
+    var first = weights[0], last = weights[weights.length - 1];
+    document.getElementById("sStart").textContent = first ? fmt(first.kg) : "–";
+    document.getElementById("sNow").textContent = last ? fmt(last.kg) : "–";
+    var status = document.getElementById("wStatus");
+    var rate = null;
+    if (weights.length > 1) {
+      var days = (new Date(last.d) - new Date(first.d)) / 864e5;
+      if (days >= 6) rate = (last.kg - first.kg) / days * 7;
+    }
+    document.getElementById("sRate").textContent = rate == null ? "–" : (rate >= 0 ? "+" : "") + fmt(rate);
+    status.className = "status";
+    if (rate == null) status.textContent = "Ajoutez une pesée par semaine pour voir le rythme de prise.";
+    else if (rate < 0.2) { status.className = "status warn"; status.textContent = "Prise trop lente : ajouter 200 à 300 kcal par jour (par exemple une demi-portion de goûter en plus)."; }
+    else if (rate > 0.7) { status.className = "status warn"; status.textContent = "Prise rapide : réduire légèrement les portions de féculents au dîner."; }
+    else status.textContent = "Rythme dans l'objectif. On continue ainsi.";
+
+    var svg = document.getElementById("chart"); svg.textContent = "";
+    var ns = "http://www.w3.org/2000/svg";
+    function s(tag, attrs, txt) { var e = document.createElementNS(ns, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); if (txt != null) e.textContent = txt; svg.appendChild(e); return e; }
+    var x0 = 34, x1 = 312, y0 = 14, y1 = 128;
+    var kgs = weights.map(function (w) { return w.kg; });
+    var t0 = new Date(first.d).getTime(), tEnd = Math.max(new Date(last.d).getTime(), t0 + 28 * 864e5);
+    var targetEnd = first.kg + 0.4 * (tEnd - t0) / (7 * 864e5);
+    var lo = Math.floor(Math.min.apply(null, kgs.concat([first.kg])) - 1), hi = Math.ceil(Math.max.apply(null, kgs.concat([targetEnd])) + 0.5);
+    function X(t) { return x0 + (t - t0) / (tEnd - t0) * (x1 - x0); }
+    function Y(v) { return y1 - (v - lo) / (hi - lo) * (y1 - y0); }
+    var step = Math.max(1, Math.ceil((hi - lo) / 4));
+    for (var v = lo; v <= hi; v += step) {
+      s("line", { x1: x0, x2: x1, y1: Y(v), y2: Y(v), stroke: "var(--line)", "stroke-width": 1 });
+      s("text", { x: x0 - 6, y: Y(v) + 3, "text-anchor": "end" }, String(v));
+    }
+    s("line", { x1: X(t0), y1: Y(first.kg), x2: X(tEnd), y2: Y(targetEnd), stroke: "var(--accent)", "stroke-width": 1.5, "stroke-dasharray": "4 4" });
+    s("text", { x: x1, y: Y(targetEnd) - 6, "text-anchor": "end" }, "objectif +0,4/sem");
+    var pts = weights.map(function (w) { return X(new Date(w.d).getTime()) + "," + Y(w.kg); }).join(" ");
+    s("polyline", { points: pts, fill: "none", stroke: "var(--teal)", "stroke-width": 2.5, "stroke-linejoin": "round" });
+    weights.forEach(function (w, i) {
+      s("circle", { cx: X(new Date(w.d).getTime()), cy: Y(w.kg), r: i === weights.length - 1 ? 4.5 : 3, fill: i === weights.length - 1 ? "var(--accent)" : "var(--teal)" });
+    });
+    s("text", { x: x0, y: 146 }, first.d.slice(8) + "/" + first.d.slice(5, 7));
+    s("text", { x: x1, y: 146, "text-anchor": "end" }, "+4 sem.");
+
+    var ul = document.getElementById("wList"); ul.textContent = "";
+    weights.slice().reverse().forEach(function (w) {
+      var li = el("li");
+      li.appendChild(el("span", "mono", w.d.split("-").reverse().join("/")));
+      var r = el("span"); r.appendChild(el("span", "mono", fmt(w.kg) + " kg "));
+      var del = el("button", null, "✕"); del.type = "button"; del.setAttribute("aria-label", "Supprimer la pesée du " + w.d);
+      del.addEventListener("click", function () {
+        weights = weights.filter(function (x) { return x !== w; }); store.set("mpm.weights", weights); renderWeight();
+        push("delete", w);
+      });
+      r.appendChild(del); li.appendChild(r); ul.appendChild(li);
+    });
+  }
+
+  var SHOP = [
+    { id: "bb", t: "Banana bread", s: "1 cake ≈ 11 tranches", items: [
+      ["bb1", "4 bananes bien mûres (3 + 1 de secours)"], ["bb2", "2 œufs"], ["bb3", "250 g de farine (complète ou T65)"],
+      ["bb4", "80 g de sucre roux"], ["bb5", "70 g d'huile neutre (tournesol ou colza)"], ["bb6", "1 sachet de levure chimique"],
+      ["bb7", "Sel"], ["bb8", "50 g de noix", true], ["bb9", "Cannelle ou vanille", true], ["bb10", "50 g de pépites de chocolat noir", true],
+      ["bb11", "Papier cuisson + sacs de congélation"]
+    ] },
+    { id: "bo", t: "Boulettes", s: "3 goûters de 150 g", items: [
+      ["bo1", "600 g de viande hachée (bœuf 5 % ou mi-bœuf mi-volaille)"], ["bo2", "1 œuf"], ["bo3", "1 oignon"], ["bo4", "1 gousse d'ail"],
+      ["bo5", "1 bouquet de persil"], ["bo6", "50 g de chapelure"], ["bo7", "Huile d'olive"], ["bo8", "Cumin, paprika, sel, poivre"],
+      ["bo9", "30 g de parmesan ou d'emmental râpé", true], ["bo10", "3 boîtes hermétiques"]
+    ] },
+    { id: "pt", t: "Pain de thon", s: "1 moule = 4 parts de 200 g", items: [
+      ["pt1", "3 boîtes de thon listao au naturel (≈ 420 g égoutté)"], ["pt2", "5 œufs"], ["pt3", "1 petite boîte de concentré de tomate (3 c. à soupe)"],
+      ["pt4", "60 g de chapelure"], ["pt5", "1 oignon"], ["pt6", "Huile d'olive"], ["pt7", "Persil, sel, poivre"],
+      ["pt8", "Moule à cake + papier cuisson"]
+    ] },
+    { id: "pp", t: "Pain de poulet", s: "1 moule = 4 parts de 200 g", items: [
+      ["pp1", "550 g de filets de poulet crus (≈ 420 g cuits), ou 1 poulet rôti effiloché"], ["pp2", "5 œufs"],
+      ["pp3", "1 petite boîte de concentré de tomate (3 c. à soupe)"], ["pp4", "60 g de chapelure"], ["pp5", "1 oignon"],
+      ["pp6", "Huile d'olive"], ["pp7", "Persil, sel, poivre"], ["pp8", "50 g d'emmental ou de Comté râpé", true]
+    ] },
+    { id: "mu", t: "Muffins-omelette", s: "12 muffins = 3 goûters", items: [
+      ["mu1", "8 œufs"], ["mu2", "150 g de dés de jambon ou de poulet cuit"],
+      ["mu3", "200 g de légumes : poivron, oignon, tomates cerises ou épinards"], ["mu4", "60 g de Comté râpé (ou autre fromage à pâte dure)"],
+      ["mu5", "Sel, poivre, un peu d'huile"], ["mu6", "Moule à muffins (12 empreintes) ou caissettes en papier"]
+    ] },
+    { id: "sm", t: "Smoothie fruité", s: "1 goûter (dimanche)", items: [
+      ["sm1", "300 ml de jus d'orange, d'ananas ou de mangue (1 brique de 1 L = 3 smoothies)"], ["sm2", "1 banane"],
+      ["sm3", "100 g de fruits : mangue, fraises ou fruits rouges surgelés"], ["sm4", "Beurre de cacahuète (25 g par smoothie)"],
+      ["sm5", "Miel (20 g par smoothie)"], ["sm6", "30 g de fruits secs (amandes ou noix de cajou)"]
+    ] },
+    { id: "pk", t: "Pancakes à l'eau", s: "≈ 10 pancakes = 2 petits-déj.", items: [
+      ["pk1", "250 g de farine"], ["pk2", "1 sachet de levure chimique"], ["pk3", "30 g de sucre + sel"],
+      ["pk4", "2 œufs (pâte) + 4 œufs pour les œufs durs du petit-déjeuner"], ["pk5", "30 g d'huile neutre"],
+      ["pk6", "300 ml d'eau pétillante", true], ["pk7", "Vanille", true], ["pk8", "Confiture (30 g par petit-déjeuner)"],
+      ["pk9", "Papier cuisson + sacs de congélation"]
+    ] }
+  ];
+  var shopChecks = store.get("mpm.shop", {});
+  var shopOpen = {};
+  function renderShop() {
+    var box = document.getElementById("shop"); box.textContent = "";
+    var tot = 0, done = 0;
+    SHOP.forEach(function (g) {
+      var nDone = g.items.filter(function (it) { return shopChecks[it[0]]; }).length;
+      var sec = el("details", "shopgrp" + (nDone === g.items.length ? " complete" : ""));
+      sec.open = !!shopOpen[g.id];
+      sec.addEventListener("toggle", function () { shopOpen[g.id] = sec.open; });
+      var sum = el("summary");
+      sum.appendChild(el("span", "gname", g.t));
+      sum.appendChild(el("span", "gmeta", g.s + " · " + nDone + "/" + g.items.length));
+      sec.appendChild(sum);
+      var ul = el("ul");
+      g.items.forEach(function (it) {
+        tot++; if (shopChecks[it[0]]) done++;
+        var li = el("li"), lab = el("label"), inp = el("input");
+        inp.type = "checkbox"; inp.id = "shop-" + it[0]; inp.checked = !!shopChecks[it[0]];
+        inp.addEventListener("change", function () {
+          if (inp.checked) shopChecks[it[0]] = true; else delete shopChecks[it[0]];
+          store.set("mpm.shop", shopChecks); renderShop();
+        });
+        var sp = el("span", null, it[1]);
+        if (it[2]) { sp.appendChild(document.createTextNode(" ")); sp.appendChild(el("span", "opt", "(facultatif)")); }
+        lab.appendChild(inp); lab.appendChild(sp); li.appendChild(lab); ul.appendChild(li);
+      });
+      sec.appendChild(ul); box.appendChild(sec);
+    });
+    document.getElementById("shopCount").textContent = done + " / " + tot;
+  }
+  document.getElementById("shopReset").addEventListener("click", function () { shopChecks = {}; store.set("mpm.shop", shopChecks); renderShop(); });
+
+  function render() { renderDays(); renderDay(); }
+
+  document.getElementById("wA").addEventListener("click", function () { state.week = "A"; store.set("mpm.week", "A"); render(); });
+  document.getElementById("wB").addEventListener("click", function () { state.week = "B"; store.set("mpm.week", "B"); render(); });
+  document.getElementById("resetDay").addEventListener("click", function () { checks = {}; store.set("mpm.checks", checks); renderDay(); });
+  document.getElementById("wDate").value = todayKey;
+  document.getElementById("wForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var d = document.getElementById("wDate").value, kg = parseFloat(document.getElementById("wKg").value);
+    if (!d || !(kg > 0)) return;
+    weights = weights.filter(function (w) { return w.d !== d; }); weights.push({ d: d, kg: kg });
+    store.set("mpm.weights", weights); document.getElementById("wKg").value = ""; renderWeight();
+    push("add", { d: d, kg: kg });
+  });
+
+  document.getElementById("keyInput").value = syncKey;
+  document.getElementById("keyForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    syncKey = document.getElementById("keyInput").value.trim(); store.set("mpm.key", syncKey); pull();
+  });
+  document.getElementById("syncBtn").addEventListener("click", pull);
+
+  render(); renderWeight(); renderShop(); pull();
+})();
+</script>
+</body>
+</html>
